@@ -1,5 +1,5 @@
 #include <Wire.h>
-#include "AccelStepper.h"
+#include "MobaTools.h"
 const int MPU = 0x68; // MPU6050 I2C address
 
 float gyroAngleX {};
@@ -13,10 +13,14 @@ unsigned long previousTime {};
 int prevTime{millis()};
 
 // defines pins for motots
-constexpr int stepPin { 5 };
-constexpr int dirPin { 4 };
+constexpr int stepPinL { 5 };
+constexpr int dirPinL { 4 };
+constexpr int stepPinR { 3 };
+constexpr int dirPinR { 2 };
 
-AccelStepper stepperL(AccelStepper::DRIVER, stepPin, dirPin);
+constexpr int stepsPerRevolution { 800 };
+MoToStepper stepperL(stepsPerRevolution, STEPDIR);
+MoToStepper stepperR(stepsPerRevolution, STEPDIR);
 
 void setup() {
   Serial.begin(9600);
@@ -27,31 +31,31 @@ void setup() {
   Wire.write(0x00);    
   Wire.endTransmission(true);  
 
-  stepperL.setMaxSpeed(4000);
-  stepperL.setSpeed(2400);
+  constexpr int speed { 400 };
+  stepperR.attach( stepPinR, dirPinR );
+  stepperL.attach( stepPinL, dirPinL );
+  stepperR.setSpeed( speed );
+  stepperL.setSpeed( speed );
 
   delay(20);
 }
 void loop() {
+  //time variables used in pitch calculation
   int currentTime{millis()};
-
   float pitch {getPitch()};
   Serial.print(pitch);
   Serial.print('\n');
   prevTime = currentTime;
 
-  if(pitch > 1)
+  if(pitch > 0.5)
   {
-    //Serial.print("PITCH IS < ONE\n");
-    //Serial.flush();
-    
-    stepperL.runSpeed();
+    stepperR.doSteps( -10 );
+    stepperL.doSteps( 10 );
   }
-  else if(pitch < -1)
+  else if(pitch < -0.5)
   {
-    //Serial.print("PITCH IS > MINUS ONE\n");
-    //Serial.flush();
-    stepperL.runSpeed();
+    stepperR.doSteps( 10 );
+    stepperL.doSteps( -10 );
   }
 }
 
