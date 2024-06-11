@@ -31,14 +31,15 @@ void setup() {
   Wire.write(0x00);    
   Wire.endTransmission(true);  
 
-  constexpr int speed { 400 };
+  
   stepperR.attach( stepPinR, dirPinR );
   stepperL.attach( stepPinL, dirPinL );
-  stepperR.setSpeed( speed );
-  stepperL.setSpeed( speed );
+  
 
   delay(20);
 }
+//lowest speed 100, stepSize 10, 5, 2 works
+//let's try 1/20th of speed for step size
 void loop() {
   //time variables used in pitch calculation
   int currentTime{millis()};
@@ -47,15 +48,20 @@ void loop() {
   Serial.print('\n');
   prevTime = currentTime;
 
-  if(pitch > 0.5)
+  int speed { abs(pitch) * 1000 };
+  int stepSize { pitch * 50 };
+  stepperR.setSpeed( speed );
+  stepperL.setSpeed( speed );
+
+  if(pitch > 0.2)
   {
-    stepperR.doSteps( -10 );
-    stepperL.doSteps( 10 );
+    stepperR.doSteps( -stepSize );
+    stepperL.doSteps( stepSize );
   }
-  else if(pitch < -0.5)
+  else if(pitch < -0.2)
   {
-    stepperR.doSteps( 10 );
-    stepperL.doSteps( -10 );
+    stepperR.doSteps( -stepSize );
+    stepperL.doSteps( stepSize );
   }
 }
 
