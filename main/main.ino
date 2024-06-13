@@ -10,6 +10,16 @@ unsigned long elapsedTime {};
 unsigned long currentTime {};
 unsigned long previousTime {};
 
+//turn into array if this works
+//possibly make doubles because of conversion
+float pitch0 { 0 };
+float pitch1 { 0 };
+float pitch2 { 0 };
+float pitch3 { 0 };
+float pitch4 { 0 };
+
+int counter{ 0 };
+
 int prevTime{millis()};
 
 // defines pins for motots
@@ -43,10 +53,37 @@ void setup() {
 void loop() {
   //time variables used in pitch calculation
   int currentTime{millis()};
-  float pitch {getPitch()};
-  Serial.print(pitch);
+  float rawPitch {getPitch()};
+  Serial.print("R: ");
+  Serial.print(rawPitch);
   Serial.print('\n');
   prevTime = currentTime;
+
+  //calc average pitch
+  switch(counter++ % 5)
+  {
+    case 0:
+      pitch0 = rawPitch;
+      break;
+    case 1:
+      pitch1 = rawPitch;
+      break;
+    case 2:
+      pitch2 = rawPitch;
+      break;
+    case 3:
+      pitch3 = rawPitch;
+      break;
+    case 4:
+      pitch4 = rawPitch;
+      break;
+  }
+  float pitch = ( pitch0 + pitch1 + pitch2 + pitch3 + pitch4 ) / 5;
+
+  //print avg pitch
+  Serial.print("A: ");
+  Serial.print(pitch);
+  Serial.print('\n');
 
   int speed { abs(pitch) * 1000 };
   int stepSize { pitch * 50 };
