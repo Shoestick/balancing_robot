@@ -1,4 +1,6 @@
+#include <ArduinoSTL.h>
 #include <Wire.h>
+#include <vector>
 #include "MobaTools.h"
 const int MPU = 0x68; // MPU6050 I2C address
 
@@ -17,6 +19,9 @@ float pitch1 { 0 };
 float pitch2 { 0 };
 float pitch3 { 0 };
 float pitch4 { 0 };
+
+constexpr int avgLen { 20 };
+std::vector<double> pitchData( avgLen );
 
 int counter{ 0 };
 
@@ -53,37 +58,26 @@ void setup() {
 void loop() {
   //time variables used in pitch calculation
   int currentTime{millis()};
-  float rawPitch {getPitch()};
-  Serial.print("R: ");
-  Serial.print(rawPitch);
-  Serial.print('\n');
+  double pitchRaw {getPitch()};
+  //Serial.print("R: ");
+  Serial.print(pitchRaw);
+  Serial.print(", ");
   prevTime = currentTime;
 
   //calc average pitch
-  switch(counter++ % 5)
+  pitchData[counter++ % avgLen] = pitchRaw;
+  double pitchTotal { 0 };
+  for(auto const &e : pitchData)
   {
-    case 0:
-      pitch0 = rawPitch;
-      break;
-    case 1:
-      pitch1 = rawPitch;
-      break;
-    case 2:
-      pitch2 = rawPitch;
-      break;
-    case 3:
-      pitch3 = rawPitch;
-      break;
-    case 4:
-      pitch4 = rawPitch;
-      break;
+    pitchTotal += e;
   }
-  float pitch = ( pitch0 + pitch1 + pitch2 + pitch3 + pitch4 ) / 5;
+
+  double pitch = pitchTotal / avgLen;
 
   //print avg pitch
-  Serial.print("A: ");
-  Serial.print(pitch);
-  Serial.print('\n');
+  //Serial.print("A: ");
+  Serial.println(pitch);
+  //Serial.print('\n');
 
   int speed { abs(pitch) * 1000 };
   int stepSize { pitch * 50 };
@@ -102,7 +96,7 @@ void loop() {
   }
 }
 
-float getPitch()
+double getPitch()
 {
   // Read in Acceleration Data //
   Wire.beginTransmission(MPU);
