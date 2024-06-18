@@ -4,6 +4,24 @@
 #include "MobaTools.h"
 const int MPU = 0x68; // MPU6050 I2C address
 
+// PID coefficients
+double kP { 1 };
+double kI { 0 };
+double kD { 0 };
+
+double errorPrev { 0 };
+double error { 0 };
+double integral { 0 };
+
+//how large pitch needs to be to start motors
+constexpr double motorThreshold { 0.05 };
+// least number of steps that motors can take
+constexpr int stepSizeMinimum { 5 };
+// multiplier for stepSize in relation to error
+constexpr int stepSizeConstant { stepSizeMinimum / motorThreshold };
+// multiplier for speed in relation to stepSize
+constexpr int speedConstant { 20 };
+
 float gyroAngleX {};
 float gyroAngleY {};
 float gyroAngleZ {};
@@ -12,15 +30,9 @@ unsigned long elapsedTime {};
 unsigned long currentTime {};
 unsigned long previousTime {};
 
-//turn into array if this works
-//possibly make doubles because of conversion
-float pitch0 { 0 };
-float pitch1 { 0 };
-float pitch2 { 0 };
-float pitch3 { 0 };
-float pitch4 { 0 };
-
-constexpr int avgLen { 20 };
+// vector to average pitch
+// high slow to respond vs. low jittery and noisy
+constexpr int avgLen { 15 };
 std::vector<double> pitchData( avgLen );
 
 int counter{ 0 };
@@ -46,58 +58,70 @@ void setup() {
   Wire.write(0x00);    
   Wire.endTransmission(true);  
 
-  
   stepperR.attach( stepPinR, dirPinR );
   stepperL.attach( stepPinL, dirPinL );
   
-
   delay(20);
 }
-//lowest speed 100, stepSize 10, 5, 2 works
-//let's try 1/20th of speed for step size
-void loop() {
-  //time variables used in pitch calculation
-  int currentTime{millis()};
-  double pitchRaw {getPitch()};
-  //Serial.print("R: ");
-  Serial.print(pitchRaw);
-  Serial.print(", ");
-  prevTime = currentTime;
 
-  //calc average pitch
-  pitchData[counter++ % avgLen] = pitchRaw;
+void loop() {
+  double pitch {getPitch()};
+  Serial.print(pitch);
+  Serial.print(", ");
+
+  errorPrev = error;
+  error = getPitchAvg(pitch);
+
+  Serial.print(error);
+  Serial.print(", ");
+
+  integral += error / elapsedTime;
+  // differentials values are otherwise too low to detect. high makes noise, low makes undetectable
+  constexpr int diffResolution { 20 };
+  double differential = (error - errorPrev) * diffResolution / elapsedTime;
+
+  Serial.print(integral);
+  Serial.print(", ");
+  Serial.print(differential);
+  Serial.print(", ");
+  Serial.print(elapsedTime);
+  Serial.print(", ");
+
+  double output { kP * error + kI * integral + kD * differential };
+
+  Serial.println(output);
+
+  int stepSize { output * stepSizeConstant };
+  int speed { abs(stepSize) * speedConstant };
+  stepperR.setSpeed( speed );
+  stepperL.setSpeed( speed );
+
+  if(output > motorThreshold)
+  {
+    stepperR.doSteps( -stepSize );
+    stepperL.doSteps( stepSize );
+  }
+  else if(output < -motorThreshold)
+  {
+    stepperR.doSteps( -stepSize );
+    stepperL.doSteps( stepSize );
+  }
+}
+
+double getPitchAvg(double pitch)
+{
+  pitchData[counter++ % avgLen] = pitch;
   double pitchTotal { 0 };
   for(auto const &e : pitchData)
   {
     pitchTotal += e;
   }
-
-  double pitch = pitchTotal / avgLen;
-
-  //print avg pitch
-  //Serial.print("A: ");
-  Serial.println(pitch);
-  //Serial.print('\n');
-
-  int speed { abs(pitch) * 1000 };
-  int stepSize { pitch * 50 };
-  stepperR.setSpeed( speed );
-  stepperL.setSpeed( speed );
-
-  if(pitch > 0.2)
-  {
-    stepperR.doSteps( -stepSize );
-    stepperL.doSteps( stepSize );
-  }
-  else if(pitch < -0.2)
-  {
-    stepperR.doSteps( -stepSize );
-    stepperL.doSteps( stepSize );
-  }
+  return pitchTotal / avgLen;
 }
 
 double getPitch()
 {
+
   // Read in Acceleration Data //
   Wire.beginTransmission(MPU);
   //constexpr int accelRegister {0x3B};
@@ -113,8 +137,8 @@ double getPitch()
 
   // Read in Gyro Data //
   previousTime = currentTime;        
-  currentTime = millis();  
-  elapsedTime = (currentTime - previousTime) / 1000;
+  currentTime = millis();
+  elapsedTime = (currentTime - previousTime);
   Wire.beginTransmission(MPU);
   //constexpr int gyroRegister {0x45};
   Wire.write(0x45);
@@ -123,7 +147,7 @@ double getPitch()
   // Datasheet says to divide raw gyro data by 131 for 250deg/s range
   float GyroY {(Wire.read() << 8 | Wire.read()) / 131.0};
   
-  gyroAngleY = gyroAngleY + GyroY * elapsedTime;
+  gyroAngleY = gyroAngleY + GyroY * (elapsedTime / 1000);
 
   return 0.96 * gyroAngleY + 0.04 * accAngleY;
 }
