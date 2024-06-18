@@ -12,15 +12,7 @@ unsigned long elapsedTime {};
 unsigned long currentTime {};
 unsigned long previousTime {};
 
-//turn into array if this works
-//possibly make doubles because of conversion
-float pitch0 { 0 };
-float pitch1 { 0 };
-float pitch2 { 0 };
-float pitch3 { 0 };
-float pitch4 { 0 };
-
-constexpr int avgLen { 20 };
+constexpr int avgLen { 90 };
 std::vector<double> pitchData( avgLen );
 
 int counter{ 0 };
@@ -53,16 +45,13 @@ void setup() {
 
   delay(20);
 }
-//lowest speed 100, stepSize 10, 5, 2 works
-//let's try 1/20th of speed for step size
+
 void loop() {
   //time variables used in pitch calculation
   int currentTime{millis()};
   double pitchRaw {getPitch()};
   //Serial.print("R: ");
-  Serial.print(pitchRaw);
-  Serial.print(", ");
-  prevTime = currentTime;
+  
 
   //calc average pitch
   pitchData[counter++ % avgLen] = pitchRaw;
@@ -74,25 +63,25 @@ void loop() {
 
   double pitch = pitchTotal / avgLen;
 
+  Serial.println(elapsedTime);
+
   //print avg pitch
   //Serial.print("A: ");
-  Serial.println(pitch);
   //Serial.print('\n');
 
-  int speed { abs(pitch) * 1000 };
-  int stepSize { pitch * 50 };
+  int speed { abs(pitch) * 2000 };
   stepperR.setSpeed( speed );
   stepperL.setSpeed( speed );
 
-  if(pitch > 0.2)
+  if(pitch >= 0.01)
   {
-    stepperR.doSteps( -stepSize );
-    stepperL.doSteps( stepSize );
+    stepperR.rotate( -1 );
+    stepperL.rotate( 1 );
   }
-  else if(pitch < -0.2)
+  else if(pitch <= -0.01)
   {
-    stepperR.doSteps( -stepSize );
-    stepperL.doSteps( stepSize );
+    stepperR.rotate( 1 );
+    stepperL.rotate( -1 );
   }
 }
 
@@ -114,7 +103,7 @@ double getPitch()
   // Read in Gyro Data //
   previousTime = currentTime;        
   currentTime = millis();  
-  elapsedTime = (currentTime - previousTime) / 1000;
+  elapsedTime = (currentTime - previousTime) ;
   Wire.beginTransmission(MPU);
   //constexpr int gyroRegister {0x45};
   Wire.write(0x45);
@@ -123,7 +112,7 @@ double getPitch()
   // Datasheet says to divide raw gyro data by 131 for 250deg/s range
   float GyroY {(Wire.read() << 8 | Wire.read()) / 131.0};
   
-  gyroAngleY = gyroAngleY + GyroY * elapsedTime;
+  gyroAngleY = gyroAngleY + GyroY * (elapsedTime / 1000);
 
   return 0.96 * gyroAngleY + 0.04 * accAngleY;
 }
