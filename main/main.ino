@@ -14,13 +14,7 @@ double error { 0 };
 double integral { 0 };
 
 //how large pitch needs to be to start motors
-constexpr double motorThreshold { 0.05 };
-// least number of steps that motors can take
-constexpr int stepSizeMinimum { 5 };
-// multiplier for stepSize in relation to error
-constexpr int stepSizeConstant { stepSizeMinimum / motorThreshold };
-// multiplier for speed in relation to stepSize
-constexpr int speedConstant { 20 };
+constexpr double motorThreshold { 0.01 };
 
 float gyroAngleX {};
 float gyroAngleY {};
@@ -32,7 +26,7 @@ unsigned long previousTime {};
 
 // vector to average pitch
 // high slow to respond vs. low jittery and noisy
-constexpr int avgLen { 15 };
+constexpr int avgLen { 20 };
 std::vector<double> pitchData( avgLen );
 
 int counter{ 0 };
@@ -65,46 +59,37 @@ void setup() {
 }
 
 void loop() {
+
   double pitch {getPitch()};
-  Serial.print(pitch);
-  Serial.print(", ");
 
   errorPrev = error;
   error = getPitchAvg(pitch);
 
-  Serial.print(error);
-  Serial.print(", ");
-
   integral += error / elapsedTime;
+
   // differentials values are otherwise too low to detect. high makes noise, low makes undetectable
   constexpr int diffResolution { 20 };
   double differential = (error - errorPrev) * diffResolution / elapsedTime;
 
-  Serial.print(integral);
-  Serial.print(", ");
-  Serial.print(differential);
-  Serial.print(", ");
-  Serial.print(elapsedTime);
-  Serial.print(", ");
-
   double output { kP * error + kI * integral + kD * differential };
 
-  Serial.println(output);
+  Serial.print(output);
+  Serial.print(", ");
+  Serial.println(elapsedTime);
 
-  int stepSize { output * stepSizeConstant };
-  int speed { abs(stepSize) * speedConstant };
+  int speed { abs(output) * 1000 };
   stepperR.setSpeed( speed );
   stepperL.setSpeed( speed );
 
-  if(output > motorThreshold)
+  if(output >= motorThreshold)
   {
-    stepperR.doSteps( -stepSize );
-    stepperL.doSteps( stepSize );
+    stepperR.rotate( -1 );
+    stepperL.rotate( 1 );
   }
-  else if(output < -motorThreshold)
+  else if(output <= -motorThreshold)
   {
-    stepperR.doSteps( -stepSize );
-    stepperL.doSteps( stepSize );
+    stepperR.rotate( 1 );
+    stepperL.rotate( -1 );
   }
 }
 
@@ -136,7 +121,7 @@ double getPitch()
   float accAngleY {atan(-1 * AccX / sqrt(pow(AccY, 2) + pow(AccZ, 2))) * 180 / PI};
 
   // Read in Gyro Data //
-  previousTime = currentTime;        
+  previousTime = currentTime;
   currentTime = millis();
   elapsedTime = (currentTime - previousTime);
   Wire.beginTransmission(MPU);
