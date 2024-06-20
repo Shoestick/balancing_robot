@@ -14,7 +14,7 @@ double error { 0 };
 double integral { 0 };
 
 //how large pitch needs to be to start motors
-constexpr double motorThreshold { 0.01 };
+constexpr double motorThreshold { 0.02 };
 
 float gyroAngleX {};
 float gyroAngleY {};
@@ -26,7 +26,7 @@ unsigned long previousTime {};
 
 // vector to average pitch
 // high slow to respond vs. low jittery and noisy
-constexpr int avgLen { 20 };
+constexpr int avgLen { 80 };
 std::vector<double> pitchData( avgLen );
 
 int counter{ 0 };
@@ -73,23 +73,28 @@ void loop() {
 
   double output { kP * error + kI * integral + kD * differential };
 
-  Serial.print(output);
-  Serial.print(", ");
-  Serial.println(elapsedTime);
+  //Serial.println(output);
+  /*Serial.print(", ");
+  Serial.println(elapsedTime);*/
 
-  int speed { abs(output) * 1000 };
+  int speed { abs(output) * 2000 };
+  int stepSize { output * 50 };
   stepperR.setSpeed( speed );
   stepperL.setSpeed( speed );
 
   if(output >= motorThreshold)
   {
-    stepperR.rotate( -1 );
-    stepperL.rotate( 1 );
+    stepperR.doSteps( -stepSize );
+    stepperL.doSteps( stepSize );
+    //stepperR.rotate( -1 );
+    //stepperL.rotate( 1 );
   }
   else if(output <= -motorThreshold)
   {
-    stepperR.rotate( 1 );
-    stepperL.rotate( -1 );
+    stepperR.doSteps( -stepSize );
+    stepperL.doSteps( stepSize );
+    //stepperR.rotate( 1 );
+    //stepperL.rotate( -1 );
   }
 }
 
